@@ -1,7 +1,6 @@
 use std::io::Cursor;
 use epub::doc::EpubDoc;
 use crate::models::metadata::{EpubMetadata, Chapter};
-use serde_json::Value;
 use scraper::{Html, Selector};
 
 pub struct EpubContent {
@@ -59,9 +58,7 @@ pub fn parse_epub(data: &[u8]) -> Result<EpubContent, String> {
         // Create a chapter title (either from content or fallback to number)
         let chapter_title = format!("Chapter {}", i + 1);
         let spine_id = doc.spine[i].clone();
-        
-        let current_page = doc.get_current_page();
-            
+                    
         // Set current page to the spine index
         if doc.set_current_page(i) {
             // Get content from current page

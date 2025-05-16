@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Chapter {
@@ -18,10 +18,10 @@ pub struct EpubMetadata {
 
 impl EpubMetadata {
     pub fn new(
-        title: String, 
-        author: String, 
-        publication_date: Option<String>, 
-        language: Option<String>, 
+        title: String,
+        author: String,
+        publication_date: Option<String>,
+        language: Option<String>,
         description: Option<String>,
     ) -> Self {
         EpubMetadata {

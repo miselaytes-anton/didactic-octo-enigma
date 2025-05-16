@@ -35,5 +35,4 @@
 .env.test.local
 .env.production.local
 
-# EPUB test files
-*.epub
+./assets/voices/*

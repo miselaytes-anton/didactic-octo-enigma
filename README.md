@@ -10,6 +10,7 @@ This server provides an API for parsing, storing, and retrieving EPUB documents,
   - [Get Document](#get-document)
   - [Get Chapter by Index](#get-chapter-by-index)
   - [Get Audio for Chapter](#get-audio-for-chapter)
+- [Response Formats](#response-formats)
 - [Error Handling](#error-handling)
 - [Examples](#examples)
 
@@ -107,15 +108,53 @@ Generate and stream audio for a specific chapter.
 curl http://127.0.0.1:8081/document/1/chapter/0/audio -H "Accept-Language: en-US" --output chapter.wav
 ```
 
-## Error Handling
+## Response Formats
 
-The API returns appropriate HTTP status codes for different error conditions:
+### Upload EPUB Response
 
-- **400 Bad Request:** Invalid request format or parameters
-- **404 Not Found:** Resource not found
-- **500 Internal Server Error:** Server-side processing error
+The response includes document metadata and a unique document ID.
 
-Error responses include a message explaining the issue.
+```json
+{
+  "title": "Moby Dick",
+  "author": "Herman Melville",
+  "publication_date": "1851",
+  "language": "en-US",
+  "description": "The story of Captain Ahab's quest to avenge the whale that 'reaped' his leg.",
+  "document_id": 1 
+}
+```
+
+### Get Document Response
+
+Returns complete document metadata and information about all available chapters.
+
+```json
+{
+  "title": "Moby Dick",
+  "author": "Herman Melville",
+  "publication_date": "1851",
+  "language": "en-US",
+  "description": "The story of Captain Ahab's quest to avenge the whale that 'reaped' his leg.",
+  "document_id": 1,
+  "chapters_html": {
+    "chapters": [
+      {
+        "title": "Chapter 1: Loomings",
+        "content": "Call me Ishmael. Some years ago—never mind how long precisely..."
+      },
+      {
+        "title": "Chapter 2: The Carpet-Bag",
+        "content": "I stuffed a shirt or two into my old carpet-bag..."
+      }
+    ]
+  }
+}
+```
+
+### Get Chapter by Index Response
+
+Returns the text content of the specified chapter
 
 ## Examples
 

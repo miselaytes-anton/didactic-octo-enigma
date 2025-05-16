@@ -60,3 +60,49 @@ pub fn get_document(id: i64) -> Result<Document> {
     
     Ok(document)
 }
+
+pub fn get_chapter_html(id: i64, chapter_path: &str) -> Result<String> {
+    let document = get_document(id)?;
+    
+    // Parse the chapter HTML JSON
+    let chapters_html: serde_json::Value = serde_json::from_str(&document.chapters_html)
+        .map_err(|e| rusqlite::Error::InvalidParameterName(format!("Invalid JSON: {}", e)))?;
+    
+    // Get the HTML for the specific chapter
+    match chapters_html.get(chapter_path) {
+        Some(html) => {
+            if let Some(html_str) = html.as_str() {
+                Ok(html_str.to_string())
+            } else {
+                Err(rusqlite::Error::InvalidParameterName(
+                    "Chapter HTML is not a string".to_string()
+                ))
+            }
+        },
+        None => Err(rusqlite::Error::QueryReturnedNoRows),
+    }
+}
+
+pub fn get_chapter_html_by_index(id: i64, index: usize) -> Result<String> {
+    let document = get_document(id)?;
+    
+    // Parse metadata to get chapter path at the given index
+    let metadata: serde_json::Value = serde_json::from_str(&document.metadata)
+        .map_err(|e| rusqlite::Error::InvalidParameterName(format!("Invalid metadata JSON: {}", e)))?;
+    
+    // Get the chapters array from metadata
+    let chapters = metadata["chapters"].as_array()
+        .ok_or_else(|| rusqlite::Error::InvalidParameterName("No chapters found in metadata".into()))?;
+    
+    // Check if index is valid
+    if index >= chapters.len() {
+        return Err(rusqlite::Error::QueryReturnedNoRows);
+    }
+    
+    // Get the path of the chapter at the given index
+    let chapter_path = chapters[index]["path"].as_str()
+        .ok_or_else(|| rusqlite::Error::InvalidParameterName("Invalid chapter path".into()))?;
+    
+    // Now use the path to get the HTML content
+    get_chapter_html(id, chapter_path)
+}

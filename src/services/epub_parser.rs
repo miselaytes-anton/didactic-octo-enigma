@@ -48,8 +48,48 @@ pub fn parse_epub(data: &[u8]) -> Result<EpubContent, String> {
         let spine_id = doc.spine[i].clone();
         
         // Try to get the HTML content for this chapter
-        if let Some(content) = doc.get_resource_str_by_path(&spine_id) {
-            html_content.push((spine_id.clone(), content));
+        // Try different path combinations since EPUB files can have different structures
+        let possible_paths = vec![
+            spine_id.clone(),                              // Original path
+            format!("OEBPS/Text/{}", spine_id),            // Path with OEBPS/Text prefix
+            format!("OEBPS/{}", spine_id),                 // Path with OEBPS prefix
+            format!("Text/{}", spine_id),                  // Path with Text prefix
+        ];
+        
+        let mut content_found = false;
+        
+        for path in &possible_paths {
+            if content_found {
+                break;
+            }
+            
+            // Method 1: Try get_resource_str_by_path
+            if let Some(content) = doc.get_resource_str_by_path(path) {
+                println!("Found HTML content for {} using path: {}", spine_id, path);
+                html_content.push((spine_id.clone(), content));
+                content_found = true;
+                continue;
+            }
+            
+            // Method 2: Try get_resource_by_path and convert to string
+            if let Some(data) = doc.get_resource_by_path(path) {
+                match String::from_utf8(data.clone()) {
+                    Ok(content) => {
+                        println!("Found HTML content for {} using get_resource_by_path with: {}", spine_id, path);
+                        html_content.push((spine_id.clone(), content));
+                        content_found = true;
+                        continue;
+                    }
+                    Err(_) => {
+                        println!("Content for {} with path {} is not valid UTF-8", spine_id, path);
+                    }
+                }
+            }
+        }
+        
+        if !content_found {
+            // Log that we couldn't find content despite trying multiple paths
+            println!("No HTML content found for {} after trying multiple paths", spine_id);
         }
         
         // Push a basic chapter with the spine ID as the path

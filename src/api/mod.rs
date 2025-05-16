@@ -4,6 +4,7 @@ use futures_util::StreamExt;
 use serde_json::{json, Value};
 use crate::services::epub_parser::parse_epub;
 use crate::services::db;
+use std::path::PathBuf;
 
 #[post("/upload")]
 async fn upload_epub(mut payload: Multipart) -> impl Responder {
@@ -77,13 +78,14 @@ async fn get_document(path: web::Path<i64>) -> impl Responder {
             let metadata: Value = serde_json::from_str(&doc.metadata)
                 .unwrap_or_else(|_| json!({}));
             
-            let _chapters_html: Value = serde_json::from_str(&doc.chapters_html)
+            let chapters_html: Value = serde_json::from_str(&doc.chapters_html)
                 .unwrap_or_else(|_| json!({}));
             
-            // Add document_id to metadata
+            // Add document_id and chapters_html to response
             let mut response = metadata;
             if let Value::Object(ref mut obj) = response {
                 obj.insert("document_id".to_string(), json!(doc.id));
+                obj.insert("chapters_html".to_string(), chapters_html);
             }
             
             HttpResponse::Ok().json(response)
@@ -94,8 +96,61 @@ async fn get_document(path: web::Path<i64>) -> impl Responder {
     }
 }
 
+#[get("/document/{id}/{path:.*}/text")]
+async fn get_chapter_text(path_params: web::Path<(i64, PathBuf)>) -> impl Responder {
+    let (id, path) = path_params.into_inner();
+    let path_str = path.to_string_lossy().into_owned();
+    
+    println!("Trying to access chapter with path: {}", path_str); // Debug log
+    
+    match db::get_chapter_html(id, &path_str) {
+        Ok(html) => {
+            HttpResponse::Ok()
+                .content_type("text/html")
+                .body(html)
+        },
+        Err(rusqlite::Error::QueryReturnedNoRows) => {
+            HttpResponse::NotFound().body(
+                format!("Chapter not found with path {} in document {}", path_str, id)
+            )
+        },
+        Err(e) => {
+            HttpResponse::InternalServerError().body(
+                format!("Error retrieving chapter: {}", e)
+            )
+        }
+    }
+}
+
+#[get("/document/{id}/chapter/{index}")]
+async fn get_chapter_by_index(path_params: web::Path<(i64, usize)>) -> impl Responder {
+    let (id, index) = path_params.into_inner();
+    
+    println!("Trying to access chapter with index: {}", index); // Debug log
+    
+    match db::get_chapter_html_by_index(id, index) {
+        Ok(html) => {
+            HttpResponse::Ok()
+                .content_type("text/html")
+                .body(html)
+        },
+        Err(rusqlite::Error::QueryReturnedNoRows) => {
+            HttpResponse::NotFound().body(
+                format!("Chapter not found with index {} in document {}", index, id)
+            )
+        },
+        Err(e) => {
+            HttpResponse::InternalServerError().body(
+                format!("Error retrieving chapter: {}", e)
+            )
+        }
+    }
+}
+
 // Configure the API routes
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(upload_epub)
-       .service(get_document);
+       .service(get_document)
+       .service(get_chapter_text)
+       .service(get_chapter_by_index);
 }

@@ -1,12 +1,22 @@
 use std::io::Cursor;
 use epub::doc::EpubDoc;
 use crate::models::metadata::{EpubMetadata, Chapter};
+use serde_json::Value;
+use scraper::{Html, Selector};
 
 pub struct EpubContent {
     pub metadata: EpubMetadata,
-    pub html_content: Vec<(String, String)>, // (path, HTML content)
+    pub chapters: Vec<Chapter>,
 }
 
+/// Parse an EPUB file from bytes
+/// 
+/// This function takes the raw bytes of an EPUB file and extracts:
+/// 1. Metadata (title, author, etc.)
+/// 2. Chapter information
+/// 3. HTML content for each chapter
+/// 
+/// Returns an EpubContent struct with all extracted data
 pub fn parse_epub(data: &[u8]) -> Result<EpubContent, String> {
     // Create a cursor to read the EPUB data from memory
     let cursor = Cursor::new(data);
@@ -37,68 +47,37 @@ pub fn parse_epub(data: &[u8]) -> Result<EpubContent, String> {
         .and_then(|descs| descs.first())
         .map(|s| s.to_string());
     
-    // Extract chapters
+    // Extract chapters and HTML content
     let mut chapters = Vec::new();
-    let mut html_content = Vec::new();
+
+    //print chapter length
+    println!("Number of chapters: {}", doc.spine.len());
     
     // Get chapters from the spine (list of content documents in reading order)
+    // This approach is inspired by epub-chapter-extractor
     for i in 0..doc.spine.len() {
-        // Get chapter number as a fallback title
+        // Create a chapter title (either from content or fallback to number)
         let chapter_title = format!("Chapter {}", i + 1);
         let spine_id = doc.spine[i].clone();
         
-        // Try to get the HTML content for this chapter
-        // Try different path combinations since EPUB files can have different structures
-        let possible_paths = vec![
-            spine_id.clone(),                              // Original path
-            format!("OEBPS/Text/{}", spine_id),            // Path with OEBPS/Text prefix
-            format!("OEBPS/{}", spine_id),                 // Path with OEBPS prefix
-            format!("Text/{}", spine_id),                  // Path with Text prefix
-        ];
-        
-        let mut content_found = false;
-        
-        for path in &possible_paths {
-            if content_found {
-                break;
-            }
+        let current_page = doc.get_current_page();
             
-            // Method 1: Try get_resource_str_by_path
-            if let Some(content) = doc.get_resource_str_by_path(path) {
-                println!("Found HTML content for {} using path: {}", spine_id, path);
-                html_content.push((spine_id.clone(), content));
-                content_found = true;
-                continue;
-            }
-            
-            // Method 2: Try get_resource_by_path and convert to string
-            if let Some(data) = doc.get_resource_by_path(path) {
-                match String::from_utf8(data.clone()) {
-                    Ok(content) => {
-                        println!("Found HTML content for {} using get_resource_by_path with: {}", spine_id, path);
-                        html_content.push((spine_id.clone(), content));
-                        content_found = true;
-                        continue;
-                    }
-                    Err(_) => {
-                        println!("Content for {} with path {} is not valid UTF-8", spine_id, path);
-                    }
-                }
+        // Set current page to the spine index
+        if doc.set_current_page(i) {
+            // Get content from current page
+            if let Some(content) = doc.get_current_str() {
+                // print content
+                // Add this chapter to our list
+                chapters.push(Chapter {
+                    title: chapter_title,
+                    path: spine_id,
+                    content: extract_text_from_html(&content.0),
+                });
             }
         }
-        
-        if !content_found {
-            // Log that we couldn't find content despite trying multiple paths
-            println!("No HTML content found for {} after trying multiple paths", spine_id);
-        }
-        
-        // Push a basic chapter with the spine ID as the path
-        chapters.push(Chapter {
-            title: chapter_title,
-            path: spine_id,
-        });
     }
     
+    // Return the parsed content
     Ok(EpubContent {
         metadata: EpubMetadata {
             title,
@@ -106,8 +85,70 @@ pub fn parse_epub(data: &[u8]) -> Result<EpubContent, String> {
             publication_date,
             language,
             description,
-            chapters,
         },
-        html_content,
+        chapters,
     })
+}
+
+
+/// Helper function to extract plain text content from HTML
+/// 
+/// This function removes HTML tags and returns just the text content.
+pub fn extract_text_from_html(html: &str) -> String {
+    let document = Html::parse_document(html);
+    
+    // Get the body element
+    let body_selector = Selector::parse("body").unwrap_or_else(|_| Selector::parse("html").unwrap());
+    
+    if let Some(body) = document.select(&body_selector).next() {
+        body.text().collect::<Vec<_>>().join(" ").trim().to_string()
+    } else {
+        // Fallback: just get all text nodes from the document
+        document.root_element()
+            .text()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .trim()
+            .to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::Path;
+
+    #[test]
+    fn test_parse_epub() {
+        // Path to test EPUB file
+        let epub_path = Path::new("test-3.epub");
+        
+        // Read file contents
+        let data = fs::read(epub_path).expect("Failed to read test EPUB file");
+        
+        // Parse the EPUB file
+        let result = parse_epub(&data);
+        
+        // Verify the result is Ok
+        assert!(result.is_ok(), "Failed to parse EPUB file");
+        
+        let epub_content = result.unwrap();
+        
+        // Basic assertions on the parsed content
+        assert!(!epub_content.metadata.title.is_empty(), "Title should not be empty");
+        assert!(!epub_content.metadata.author.is_empty(), "Author should not be empty");
+        
+        // Print some info about what we found
+        println!("EPUB Title: {}", epub_content.metadata.title);
+        println!("EPUB Author: {}", epub_content.metadata.author);
+        println!("Number of chapters: {}", epub_content.chapters.len());
+
+        for (i, chapter) in epub_content.chapters.iter().enumerate() {
+            println!("Chapter {}: {}", i + 1, chapter.content);
+        }
+        
+
+        //println!("First HTML content path: {}", epub_content.chapters[0]);
+    }
 }

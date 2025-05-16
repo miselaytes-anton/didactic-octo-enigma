@@ -4,6 +4,7 @@ use serde::{Serialize, Deserialize};
 pub struct Chapter {
     pub title: String,
     pub path: String,
+    pub content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -13,7 +14,6 @@ pub struct EpubMetadata {
     pub publication_date: Option<String>,
     pub language: Option<String>,
     pub description: Option<String>,
-    pub chapters: Vec<Chapter>,
 }
 
 impl EpubMetadata {
@@ -23,7 +23,6 @@ impl EpubMetadata {
         publication_date: Option<String>, 
         language: Option<String>, 
         description: Option<String>,
-        chapters: Vec<Chapter>
     ) -> Self {
         EpubMetadata {
             title,
@@ -31,7 +30,6 @@ impl EpubMetadata {
             publication_date,
             language,
             description,
-            chapters,
         }
     }
 }

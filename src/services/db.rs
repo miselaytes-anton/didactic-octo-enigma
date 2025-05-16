@@ -90,9 +90,8 @@ pub fn get_chapter_html_by_index(id: i64, index: usize) -> Result<String> {
     let metadata: serde_json::Value = serde_json::from_str(&document.metadata)
         .map_err(|e| rusqlite::Error::InvalidParameterName(format!("Invalid metadata JSON: {}", e)))?;
     
-    // Get the chapters array from metadata
-    let chapters = metadata["chapters"].as_array()
-        .ok_or_else(|| rusqlite::Error::InvalidParameterName("No chapters found in metadata".into()))?;
+    let chapters = serde_json::Value = serde_json::from_str(&document.chapters_html)
+        .map_err(|e| rusqlite::Error::InvalidParameterName(format!("Invalid chapters JSON: {}", e)))?;
     
     // Check if index is valid
     if index >= chapters.len() {

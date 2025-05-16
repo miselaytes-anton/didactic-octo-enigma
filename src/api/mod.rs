@@ -2,7 +2,7 @@ use actix_web::{post, web, HttpResponse, Responder, get};
 use actix_multipart::Multipart;
 use futures_util::StreamExt;
 use serde_json::{json, Value};
-use crate::services::epub_parser::parse_epub;
+use crate::services::epub_parser;
 use crate::services::db;
 use std::path::PathBuf;
 
@@ -33,12 +33,12 @@ async fn upload_epub(mut payload: Multipart) -> impl Responder {
             }
             
             // Parse the EPUB file
-            match parse_epub(&data) {
+            match epub_parser::parse_epub(&data) {
                 Ok(epub_content) => {
                     // Convert HTML content to a JSON object
                     let mut html_json = json!({});
-                    for (path, html) in &epub_content.html_content {
-                        html_json[path] = json!(html);
+                    for chapter in &epub_content.chapters {
+                        html_json[chapter.title.clone()] = json!(chapter.content);
                     }
                     
                     // Save to database

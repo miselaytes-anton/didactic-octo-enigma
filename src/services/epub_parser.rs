@@ -2,7 +2,12 @@ use std::io::Cursor;
 use epub::doc::EpubDoc;
 use crate::models::metadata::{EpubMetadata, Chapter};
 
-pub fn parse_epub(data: &[u8]) -> Result<EpubMetadata, String> {
+pub struct EpubContent {
+    pub metadata: EpubMetadata,
+    pub html_content: Vec<(String, String)>, // (path, HTML content)
+}
+
+pub fn parse_epub(data: &[u8]) -> Result<EpubContent, String> {
     // Create a cursor to read the EPUB data from memory
     let cursor = Cursor::new(data);
     
@@ -34,26 +39,35 @@ pub fn parse_epub(data: &[u8]) -> Result<EpubMetadata, String> {
     
     // Extract chapters
     let mut chapters = Vec::new();
+    let mut html_content = Vec::new();
     
     // Get chapters from the spine (list of content documents in reading order)
     for i in 0..doc.spine.len() {
         // Get chapter number as a fallback title
         let chapter_title = format!("Chapter {}", i + 1);
-        let spine_id = &doc.spine[i];
+        let spine_id = doc.spine[i].clone();
+        
+        // Try to get the HTML content for this chapter
+        if let Some(content) = doc.get_resource_str_by_path(&spine_id) {
+            html_content.push((spine_id.clone(), content));
+        }
         
         // Push a basic chapter with the spine ID as the path
         chapters.push(Chapter {
             title: chapter_title,
-            path: spine_id.clone(),
+            path: spine_id,
         });
     }
     
-    Ok(EpubMetadata {
-        title,
-        author,
-        publication_date,
-        language,
-        description,
-        chapters,
+    Ok(EpubContent {
+        metadata: EpubMetadata {
+            title,
+            author,
+            publication_date,
+            language,
+            description,
+            chapters,
+        },
+        html_content,
     })
 }

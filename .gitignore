@@ -35,6 +35,4 @@
 .env.test.local
 .env.production.local
 
-./assets/voices/*
-
 *.db

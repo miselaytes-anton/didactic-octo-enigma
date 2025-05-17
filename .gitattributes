@@ -1,2 +1,4 @@
 assets/voices/en_US-ryan-high.onnx filter=lfs diff=lfs merge=lfs -text
 assets/voices/ru_RU-ruslan-medium.onnx filter=lfs diff=lfs merge=lfs -text
+assets/voices/en_US-ryan-high.onnx.config filter=lfs diff=lfs merge=lfs -text
+assets/voices/ru_RU-ruslan-medium.onnx.config filter=lfs diff=lfs merge=lfs -text
